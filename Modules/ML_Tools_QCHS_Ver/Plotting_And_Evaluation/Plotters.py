@@ -350,7 +350,7 @@ def getMonitorComparisonPlot(monitors, names, xAxis='iter', yAxis='Loss', lrLogX
     plt.show()
 
 def plotSignificanceEstimate(inData, sigEstFuncs={}, predName='pred_class', targetName='gen_target', weightName=None):
-
+    '''Compare significance estimators.'''
     plt.figure(figsize=(8, 8))
     h_args = dict(bins=100, cumulative=-1,alpha=0.5)
 
