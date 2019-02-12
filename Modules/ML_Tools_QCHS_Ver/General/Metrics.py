@@ -10,13 +10,26 @@ from Modules.ML_Tools_QCHS_Ver.General.Misc_Functions import uncertRound
 
 wFactor = 250000/50000
 
+
+def significanceFull(s, b):
+    pass
+
+def significanceLoss2Invert(s, b, weights):
+    pass
+
+def asimovSignificanceFull(s, b, syst_factor):
+    pass
+
+def asimovSignificanceLossInvert(s, b, syst_factor, weights):
+    pass
+
 def AMS(s, b, br=10.0):
     """ Approximate Median Significance defined as:
         AMS = sqrt(
                 2 { (s + b + b_r) log[1 + (s/(b+b_r))] - s}
-              )        
+              )
     where b_r = 10, b = background, s = signal, log is natural logarithm """
-    
+
     radicand = 2 *( (s+b+br) * math.log (1.0 + s/(b+br)) -s)
     if radicand < 0:
         print('radicand is negative. Exiting')
@@ -36,7 +49,7 @@ def amsScanQuick(inData, wFactor=250000./50000., br=10):
 
     for i, cut in enumerate(inData['pred_class']):
         ams = AMS(max(0, s*wFactor), max(0, b*wFactor), br)
-        
+
         if ams > amsMax:
             amsMax = ams
             threshold = cut
@@ -44,7 +57,7 @@ def amsScanQuick(inData, wFactor=250000./50000., br=10):
             s -= inData['gen_weight'].values[i]
         else:
             b -= inData['gen_weight'].values[i]
-            
+
     return amsMax, threshold
 
 def amsScanSlow(inData, wFactor=250000./50000., br=10, start=0.9):
@@ -55,16 +68,16 @@ def amsScanSlow(inData, wFactor=250000./50000., br=10, start=0.9):
     threshold = 0.0
     signal = inData[inData['gen_target'] == 1]
     bkg = inData[inData['gen_target'] == 0]
-    
+
     for i, cut in enumerate(inData.loc[inData.pred_class >= start, 'pred_class'].values):
         s = np.sum(signal.loc[(signal.pred_class >= cut), 'gen_weight'])
         b = np.sum(bkg.loc[(bkg.pred_class >= cut), 'gen_weight'])
         ams = AMS(s*wFactor, b*wFactor, br)
-        
+
         if ams > amsMax:
             amsMax = ams
             threshold = cut
-            
+
     return amsMax, threshold
 
 def mpAMS(data, i, wFactor, br, out_q):
@@ -91,13 +104,13 @@ def bootstrapMeanAMS(data, wFactor=250000./50000., N=512, br=10):
         indeces = np.random.choice(data.index, len(data), replace=True)
         p = mp.Process(target=mpAMS, args=(data.iloc[indeces], i, wFactor, br, out_q))
         procs.append(p)
-        p.start() 
+        p.start()
     resultdict = {}
     for i in range(N):
-        resultdict.update(out_q.get()) 
+        resultdict.update(out_q.get())
     for p in procs:
-        p.join()  
-        
+        p.join()
+
     amss = np.array([resultdict[x] for x in resultdict if 'ams' in x])
     cuts = np.array([resultdict[x] for x in resultdict if 'cut' in x])
 
@@ -106,7 +119,7 @@ def bootstrapMeanAMS(data, wFactor=250000./50000., N=512, br=10):
 
     ams = AMS(wFactor*np.sum(data.loc[(data.pred_class >= np.mean(cuts)) & (data.gen_target == 1), 'gen_weight']),
               wFactor*np.sum(data.loc[(data.pred_class >= np.mean(cuts)) & (data.gen_target == 0), 'gen_weight']))
-    
+
     print('\nMean AMS={}+-{}, at mean cut of {}+-{}'.format(meanAMS[0], meanAMS[1], meanCut[0], meanCut[1]))
     print('Exact mean cut {}, corresponds to AMS of {}'.format(np.mean(cuts), ams))
     return (meanAMS[0], meanCut[0])
@@ -119,13 +132,13 @@ def bootstrapSKFoldMeanAMS(data, size=250000., N=10, nFolds=500, br=10):
         indeces = np.random.choice(data.index, len(data), replace=True)
         p = mp.Process(target=mpSKFoldAMS, args=(data, i, size, nFolds, br, out_q))
         procs.append(p)
-        p.start() 
+        p.start()
     resultdict = {}
     for i in range(N):
-        resultdict.update(out_q.get()) 
+        resultdict.update(out_q.get())
     for p in procs:
-        p.join()  
-        
+        p.join()
+
     amss = np.array([resultdict[x] for x in resultdict if 'ams' in x])
     cuts = np.array([resultdict[x] for x in resultdict if 'cut' in x])
 
@@ -135,7 +148,7 @@ def bootstrapSKFoldMeanAMS(data, size=250000., N=10, nFolds=500, br=10):
     scale = size/len(data)
     ams = AMS(scale*np.sum(data.loc[(data.pred_class >= np.mean(cuts)) & (data.gen_target == 1), 'gen_weight']),
               scale*np.sum(data.loc[(data.pred_class >= np.mean(cuts)) & (data.gen_target == 0), 'gen_weight']))
-    
+
     print('\nMean AMS={}+-{}, at mean cut of {}+-{}'.format(meanAMS[0], meanAMS[1], meanCut[0], meanCut[1]))
     print('Exact mean cut {}, corresponds to AMS of {}'.format(np.mean(cuts), ams))
     return (meanAMS[0], meanCut[0])
