@@ -349,9 +349,11 @@ def getMonitorComparisonPlot(monitors, names, xAxis='iter', yAxis='Loss', lrLogX
     plt.ylabel(yAxis, fontsize=24, color='black')
     plt.show()
 
-def plotSignificanceEstimate(inData, sigEstFuncs={}, predName='pred_class', targetName='gen_target', weightName=None):
-    '''Compare significance estimators.'''
-    plt.figure(figsize=(8, 8))
+def plotSignificanceEstimate(inData, sigEstFuncs={}, predName='pred_class', targetName='gen_target', weightName=None, figsize=(8, 8)):
+    '''Compare significance estimators.
+
+    If an estimator returns two items, the second is interpreted as error.'''
+    plt.figure(figsize=figsize)
     h_args = dict(bins=100, cumulative=-1,alpha=0.5)
 
     df_bkg = inData[inData[targetName]==0]
@@ -378,10 +380,14 @@ def plotSignificanceEstimate(inData, sigEstFuncs={}, predName='pred_class', targ
 
     s, b = h_sig[0], h_bkg[0]
     bin_centers = (h_sig[1][:-1] + h_sig[1][1:])/2
-    plt.figure(figsize=(8, 8))
+    plt.figure(figsize=figsize)
 
     for name, fnc in sigEstFuncs.iteritems():
-        plt.plot(bin_centers, fnc(s, b), label=name)
+        est = fnc(s, b)
+        est, err = est if len(est) == 2 else (est, None)
+        plt.plot(bin_centers, est, label=name)
+        if err is not None:
+            plt.fill_between(bin_centers,est-err,est+err,linewidth=0,alpha=0.3)
 
     plt.legend(loc='best', fontsize=16)
     plt.xlabel("Class prediction", fontsize=24, color='black')
