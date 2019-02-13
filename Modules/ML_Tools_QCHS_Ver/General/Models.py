@@ -20,12 +20,12 @@ def getOptimizer(compileArgs):
     if compileArgs['optimizer'] == 'adam':
         if 'amsgrad' not in compileArgs: compileArgs['amsgrad'] = False
         if 'beta_1' not in compileArgs: compileArgs['beta_1'] = 0.9
-        optimiser = Adam(lr=compileArgs['lr'], beta_1=compileArgs['beta_1'], beta_2=0.999, epsilon=1e-08, decay=0.0, amsgrad=compileArgs['amsgrad'])
+        optimizer = Adam(lr=compileArgs['lr'], beta_1=compileArgs['beta_1'], beta_2=0.999, epsilon=1e-08, decay=0.0, amsgrad=compileArgs['amsgrad'])
 
     if compileArgs['optimizer'] == 'sgd':
         if 'momentum' not in compileArgs: compileArgs['momentum'] = 0.9
         if 'nesterov' not in compileArgs: compileArgs['nesterov'] = False
-        optimiser = SGD(lr=compileArgs['lr'], momentum=compileArgs['momentum'], decay=0.0, nesterov=compileArgs['nesterov'])
+        optimizer = SGD(lr=compileArgs['lr'], momentum=compileArgs['momentum'], decay=0.0, nesterov=compileArgs['nesterov'])
 
     return optimizer
 
@@ -33,26 +33,11 @@ def getOptimizer(compileArgs):
 def getModelNoCompile(version, nIn, compileArgs, mode, nOut=1):
     model = Sequential()
 
-    if 'depth' in compileArgs:
-        depth = compileArgs['depth']
-    else:
-        depth = 3
-    if 'width' in compileArgs:
-        width = compileArgs['width']
-    else:
-        width = 100
-    if 'do' in compileArgs:
-        do = compileArgs['do']
-    else:
-        do = False
-    if 'bn' in compileArgs:
-        bn = compileArgs['bn']
-    else:
-        bn = False
-    if 'l2' in compileArgs:
-        reg = l2(compileArgs['l2'])
-    else:
-        reg = None
+    depth = compileArgs.get('depth', 3)
+    width = compileArgs.get('width', 100)
+    do = compileArgs.get('do', False)
+    bn = compileArgs.get('bn', False)
+    reg = l2(compileArgs['l2']) if 'l2' in compileArgs else None
 
     if "modelRelu" in version:
         model.add(Dense(width, input_dim=nIn, kernel_initializer='he_normal', kernel_regularizer=reg))

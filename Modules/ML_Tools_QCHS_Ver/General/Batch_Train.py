@@ -193,7 +193,7 @@ def batchTrainRegressor(data, nSplits,
                     monLoss = model.evaluate(monitorInputs, monitorTargets, verbose=0)
                     monitorHistory.append(monLoss)
 
-                if monLoss <= best or best < 0: #Save best
+                if monLoss < best or best < 0: #Save best
                     best = monLoss
                     epochCounter = 0
                     model.save_weights(saveLoc + "best.h5")
@@ -444,8 +444,15 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                         lossHistory['val_loss'].append(loss)
                 else:
                     lossHistory['val_loss'].append(loss)
+                    _lh = lossHistory['val_loss']
+                    if (len(_lh) > 20
+                    and (_lh[-19] - _lh[-1])/_lh[-1] < 1e-7
+                    ):
+                        print('Learning process stalled at %s. Stopping...'%_lh[-1])
+                        stop = True
 
-                if loss <= best or best < 0: #Save best
+
+                if loss < best or best < 0: #Save best
                     best = loss
                     if cosAnnealMult:
                         if cosAnneal.lrs[-1] > 0:
@@ -461,13 +468,13 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                     try:
                         _store()
                     except RuntimeError: # sleep a little and try again
-                        print "RuntimeError while saving. Trying again."
+                        print("RuntimeError while saving. Trying again.")
                         import time
                         time.sleep(0.5)
                         try:
                             _store()
                         except RuntimeError:
-                            print "RuntimeError while saving again!!! Maybe next time then."
+                            print("RuntimeError while saving again!!! Maybe next time then.")
                     if reduxDecayActive:
                         cosAnneal.lrs.append(float(K.get_value(model.optimizer.lr)))
                     if verbose:

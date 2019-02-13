@@ -8,20 +8,48 @@ from sklearn.model_selection import StratifiedKFold
 
 from Modules.ML_Tools_QCHS_Ver.General.Misc_Functions import uncertRound
 
+from keras import backend as K
+sqrt, power, log = np.sqrt, np.power, np.log
+
 wFactor = 250000/50000
 
 
-def significanceFull(s, b):
-    pass
+def Z_asimov(s, b, syst=K.epsilon()):
+    """Asimov Significance"""
+    return sqrt( -2.0/(syst*syst)*log( b/( b+(b*b)*(syst*syst))*(syst*syst)*s+1.0)+ 2.0*(
+        b+s)*log(( b+s)*( b+(b*b)*(syst*syst))/( (b*b)+( b+s)*(b*b)*(syst*syst))))
 
-def significanceLoss2Invert(s, b, weights):
-    pass
+def eZ_asimov(s, es, b, eb, syst=K.epsilon()):
+    """Asimov Significance error"""
+    return power(-(eb*eb)/( 1.0/(syst*syst)*log( b/( b+(b*b)*(syst*syst))*(syst*syst)*s+1.0)-(
+        b+s)*log(( b+s)*( b+(b*b)*(syst*syst))/( (b*b)+( b+s)*(b*b)*(syst*syst))))*power(
+        1.0/( b/( b+(b*b)*(syst*syst))*(syst*syst)*s+1.0)/(syst*syst)*(1.0/( b+(b*b)*(syst*syst))*(
+            syst*syst)*s-b/power( b+(b*b)*(syst*syst),2.0)*(syst*syst)*( 2.0*b*(syst*syst)+1.0)*s)-(
+            ( b+s)*( 2.0*b*(syst*syst)+1.0)/( (b*b)+( b+s)*(b*b)*(syst*syst))+( b+(b*b)*(syst*syst))/(
+                (b*b)+( b+s)*(b*b)*(syst*syst))-( b+s)*( 2.0*( b+s)*b*(syst*syst)+2.0*b+(b*b)*(syst*syst))*(
+                b+(b*b)*(syst*syst))/power( (b*b)+( b+s)*(b*b)*(syst*syst),2.0))/( b+(b*b)*(syst*syst))*(
+            (b*b)+( b+s)*(b*b)*(syst*syst))-log(( b+s)*( b+(b*b)*(syst*syst))/(
+            (b*b)+( b+s)*(b*b)*(syst*syst))),2.0)/2.0-1.0/( 1.0/(syst*syst)*log(
+        b/( b+(b*b)*(syst*syst))*(syst*syst)*s+1.0)-( b+s)*log(( b+s)*( b+(b*b)*(syst*syst))/(
+        (b*b)+( b+s)*(b*b)*(syst*syst))))*power( log(( b+s)*( b+(b*b)*(syst*syst))/(
+        (b*b)+( b+s)*(b*b)*(syst*syst)))+1.0/( b+(b*b)*(syst*syst))*(
+        (b+(b*b)*(syst*syst))/( (b*b)+( b+s)*(b*b)*(syst*syst))-( b+s)*(b*b)*(
+            b+(b*b)*(syst*syst))*(syst*syst)/power( (b*b)+( b+s)*(b*b)*(syst*syst),2.0))*(
+        (b*b)+( b+s)*(b*b)*(syst*syst))-1.0/( b/( b+(b*b)*(syst*syst))*(syst*syst)*s+1.0)*b/(
+        b+(b*b)*(syst*syst)),2.0)*(es*es)/2.0,(1.0/2.0))
 
-def asimovSignificanceFull(s, b, syst_factor):
-    pass
+def wghtd_Z_asimov(scale_s, n_s, scale_b, n_b, syst=K.epsilon()):
+    """Weighted Asimov Significance
 
-def asimovSignificanceLossInvert(s, b, syst_factor, weights):
-    pass
+    n_s, n_b are the number of events used for testing, etc."""
+    return Z_asimov(scale_s*n_s, scale_b*n_b, syst)
+
+def wghtd_eZ_asimov(scale_s, n_s, scale_b, n_b, syst=K.epsilon()):
+    """Weighted Asimov Significance error
+
+    sqrt(x) is used as error on x.
+    n_s, n_b are the number of events used for testing, etc."""
+    return eZ_asimov(scale_s*n_s, scale_s*sqrt(n_s), scale_b*n_b, scale_b*sqrt(n_b), syst)
 
 def AMS(s, b, br=10.0):
     """ Approximate Median Significance defined as:
@@ -30,12 +58,12 @@ def AMS(s, b, br=10.0):
               )
     where b_r = 10, b = background, s = signal, log is natural logarithm """
 
-    radicand = 2 *( (s+b+br) * math.log (1.0 + s/(b+br)) -s)
-    if radicand < 0:
+    radicand = 2 *( (s+b+br) * np.log (1.0 + s/(b+br)) -s)
+    if isinstance(radicand, float) and radicand < 0:
         print('radicand is negative. Exiting')
         return -1
     else:
-        return math.sqrt(radicand)
+        return np.sqrt(radicand)
 
 def amsScanQuick(inData, wFactor=250000./50000., br=10):
     '''Determine optimum AMS and cut,

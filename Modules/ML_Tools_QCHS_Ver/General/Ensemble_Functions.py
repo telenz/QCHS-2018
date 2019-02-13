@@ -36,12 +36,12 @@ def ensemblePredict(inData, ensemble, weights, outputPipe=None, nOut=1, n=-1): #
         pred += weights[i] * tempPred
     return pred
 
-def loadModel(cycle, compileArgs, mva='NN', loadMode='model', location='train_weights/train_'): 
+def loadModel(cycle, compileArgs, mva='NN', loadMode='model', location='train_weights/train_', custom_objects={}):
     cycle = int(cycle)
     model = None
     if mva == 'NN':
         if loadMode == 'model':
-            model = load_model(location + str(cycle) + '.h5')
+            model = load_model(location + str(cycle) + '.h5', custom_objects)
         elif loadMode == 'weights':
             model = model_from_json(open(location + str(cycle) + '.json').read())
             model.load_weights(location + str(cycle) + '.h5')
@@ -49,7 +49,7 @@ def loadModel(cycle, compileArgs, mva='NN', loadMode='model', location='train_we
         else:
             print ("No other loading currently supported")
     else:
-        with open(location + str(cycle) + '.pkl', 'r') as fin:   
+        with open(location + str(cycle) + '.pkl', 'r') as fin:
             model = pickle.load(fin)
     return model
 
@@ -62,7 +62,7 @@ def getWeights(value, metric, weighting='reciprocal'):
         print ("No other weighting currently supported")
     return None
 
-def assembleEnsemble(results, size, metric, compileArgs=None, weighting='reciprocal', mva='NN', loadMode='model', location='train_weights/train_'):
+def assembleEnsemble(results, size, metric, compileArgs=None, weighting='reciprocal', mva='NN', loadMode='model', location='train_weights/train_', custom_objects={}):
     ensemble = []
     weights = []
     print ("Choosing ensemble by", metric)
@@ -70,7 +70,7 @@ def assembleEnsemble(results, size, metric, compileArgs=None, weighting='recipro
     values = np.sort(np.array([(i, result[metric]) for i, result in enumerate(results)], dtype=dtype),
                      order=['result'])
     for i in range(min([size, len(results)])):
-        ensemble.append(loadModel(values[i]['cycle'], compileArgs, mva, loadMode, location))
+        ensemble.append(loadModel(values[i]['cycle'], compileArgs, mva, loadMode, location, custom_objects))
         weights.append(getWeights(values[i]['result'], metric, weighting))
         print ("Model", i, "is", values[i]['cycle'], "with", metric, "=", values[i]['result'])
     weights = np.array(weights)
@@ -115,7 +115,7 @@ def saveEnsemble(name, ensemble, weights, compileArgs=None, overwrite=False, inp
             with open(name + '_outputPipe.pkl', 'wb') as fout:
                 pickle.dump(outputPipe, fout)
 
-def loadEnsemble(name, ensembleSize=10, inputPipeLoad=False, outputPipeLoad=False, loadMode='model'): #Todo add loading of input feature names
+def loadEnsemble(name, ensembleSize=10, inputPipeLoad=False, outputPipeLoad=False, loadMode='model', custom_objects={}): #Todo add loading of input feature names
     ensemble = []
     weights = None
     inputPipe = None
@@ -128,14 +128,14 @@ def loadEnsemble(name, ensembleSize=10, inputPipeLoad=False, outputPipeLoad=Fals
         pass
     for i in range(ensembleSize):
         if len(glob.glob(name + "_" + str(i) + '.pkl')): #BDT
-            with open(name + '_' + str(i) + '.pkl', 'rb') as fin:   
-                model = pickle.load(fin)    
+            with open(name + '_' + str(i) + '.pkl', 'rb') as fin:
+                model = pickle.load(fin)
         else: #NN
             if loadMode == 'weights':
                 model = model_from_json(open(name + '_' + str(i) + '.json').read())
                 model.load_weights(name + "_" + str(i) + '.h5')
             elif loadMode == 'model':
-                model = load_model(name + "_" + str(i) + '.h5')
+                model = load_model(name + "_" + str(i) + '.h5', custom_objects)
         ensemble.append(model)
     with open(name + '_weights.pkl', 'rb') as fin:
         weights = pickle.load(fin)

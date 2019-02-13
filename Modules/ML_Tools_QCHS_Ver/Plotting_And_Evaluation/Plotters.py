@@ -349,12 +349,15 @@ def getMonitorComparisonPlot(monitors, names, xAxis='iter', yAxis='Loss', lrLogX
     plt.ylabel(yAxis, fontsize=24, color='black')
     plt.show()
 
-def plotSignificanceEstimate(inData, sigEstFuncs={}, predName='pred_class', targetName='gen_target', weightName=None, figsize=(8, 8)):
+def plotSignificanceEstimate(
+    inData, sigEstFuncs={}, predName='pred_class', targetName='gen_target',
+    weightName=None, figsize=(8, 8), nBins=100,
+):
     '''Compare significance estimators.
 
     If an estimator returns two items, the second is interpreted as error.'''
     plt.figure(figsize=figsize)
-    h_args = dict(bins=100, cumulative=-1,alpha=0.5)
+    h_args = dict(bins=list(1.*i/nBins for i in xrange(nBins+1)), cumulative=-1, alpha=0.5)
 
     df_bkg = inData[inData[targetName]==0]
     h_bkg = plt.hist(
@@ -373,7 +376,7 @@ def plotSignificanceEstimate(inData, sigEstFuncs={}, predName='pred_class', targ
     )
 
     plt.yscale('log')
-    plt.ylabel('Cumulative event counts / 0.02')
+    plt.ylabel('Cumulative event counts')
     plt.xlabel('Classifier output')
     plt.legend(loc='best', fontsize=16)
     plt.show()
@@ -381,13 +384,19 @@ def plotSignificanceEstimate(inData, sigEstFuncs={}, predName='pred_class', targ
     s, b = h_sig[0], h_bkg[0]
     bin_centers = (h_sig[1][:-1] + h_sig[1][1:])/2
     plt.figure(figsize=figsize)
+    n_bins_filled = min(sum(s>0), sum(b>0))
+    s = s[:n_bins_filled]
+    b = b[:n_bins_filled]
+    bin_centers = bin_centers[:n_bins_filled] 
 
     for name, fnc in sigEstFuncs.iteritems():
         est = fnc(s, b)
         est, err = est if len(est) == 2 else (est, None)
-        plt.plot(bin_centers, est, label=name)
+        p = plt.plot(bin_centers, est, label=name)
         if err is not None:
-            plt.fill_between(bin_centers,est-err,est+err,linewidth=0,alpha=0.3)
+            plt.fill_between(
+                bin_centers, est-err, est+err,
+                linewidth=0, alpha=0.3, color=p[-1].get_color())
 
     plt.legend(loc='best', fontsize=16)
     plt.xlabel("Class prediction", fontsize=24, color='black')
