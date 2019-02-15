@@ -1,18 +1,12 @@
 from __future__ import division
 
-from keras.models import Sequential, model_from_json, load_model
-from keras.layers import Dense, Activation, AlphaDropout, Dropout, BatchNormalization, PReLU
+from keras.models import Model, model_from_json, load_model
+from keras.layers import Dense, Activation, AlphaDropout, Dropout, BatchNormalization, PReLU, Input
 from keras.optimizers import *
 from keras.regularizers import *
 from keras.models import Sequential
 
 from Modules.ML_Tools_QCHS_Ver.General.Activations import *
-
-
-def getModel(version, nIn, compileArgs, mode, nOut=1):
-    model = getModelNoCompile(version, nIn, compileArgs, mode, nOut)
-    model.compile(loss=compileArgs['loss'], optimizer=getOptimizer(compileArgs), metrics=compileArgs.get('metrics'))
-    return model
 
 
 def getOptimizer(compileArgs):
@@ -30,8 +24,13 @@ def getOptimizer(compileArgs):
     return optimizer
 
 
-def getModelNoCompile(version, nIn, compileArgs, mode, nOut=1):
-    model = Sequential()
+def getModel(version, nIn, compileArgs, mode, nOut=1):
+    #this is a hack postponing refactoring
+    class MyMod(list):
+        def add(self, obj):
+            self.append(obj)
+    model = MyMod()
+    model.add(Input(shape=(nIn,)))
 
     depth = compileArgs.get('depth', 3)
     width = compileArgs.get('width', 100)
@@ -96,4 +95,25 @@ def getModelNoCompile(version, nIn, compileArgs, mode, nOut=1):
     elif 'regress' in mode:
         model.add(Dense(nOut, activation='linear', kernel_initializer='glorot_normal'))
 
-    return model
+    # instead of an actual model, 'model' is only a list so far
+    # it's instantiated in a special way in order to propagate the weights to the loss function
+    inputLayer = model.pop(0)
+    lastLayer = inputLayer
+    for l in model:
+        lastLayer = l(lastLayer)
+
+    # prep loss funtion to eat weights and make model
+    loss_fnc = compileArgs['loss']
+    weightsInput = getattr(loss_fnc, 'weightsInput', None)
+    if weightsInput is not None:
+        keras_model = Model(inputs=[inputLayer,weightsInput],outputs=lastLayer)
+
+    else:
+        keras_model = Model(inputs=[inputLayer],outputs=lastLayer)
+
+    keras_model.compile(
+        loss=loss_fnc,
+        optimizer=getOptimizer(compileArgs),
+        metrics=compileArgs.get('metrics')
+    )
+    return keras_model
