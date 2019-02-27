@@ -20,7 +20,7 @@ def importData(dirLoc = "../Data/",
         data.drop(columns=['Weight'], inplace=True)
         trainingData = pandas.DataFrame(data.loc[data.KaggleSet == 't'])
         trainingData.drop(columns=['KaggleSet'], inplace=True)
-        
+
         test = pandas.DataFrame(data.loc[(data.KaggleSet == 'b') | (data.KaggleSet == 'v')])
         test['private'] = 0
         test.loc[(data.KaggleSet == 'v'), 'private'] = 1
@@ -49,7 +49,7 @@ def importData(dirLoc = "../Data/",
     val = trainingData.loc[valIndeces]
     print('Training on {} datapoints and validating on {}, using {} features:\n{}'.format(len(train), len(val), len(trainFeatures), [x for x in trainFeatures]))
 
-    return {'train':train[trainFeatures + ['gen_target', 'gen_weight', 'gen_weight_original']], 
+    return {'train':train[trainFeatures + ['gen_target', 'gen_weight', 'gen_weight_original']],
            'val':val[trainFeatures + ['gen_target', 'gen_weight', 'gen_weight_original']],
            'test':test,
            'features':trainFeatures}
@@ -65,37 +65,37 @@ def rotateEvent(inData):
 def zFlipEvent(inData):
     '''Flip event in z-axis such that primary lepton is in positive z-direction'''
     cut = (inData.PRI_lep_eta < 0)
-    
+
     for particle in ['PRI_lep', 'PRI_tau', 'PRI_jet_leading', 'PRI_jet_subleading']:
-        inData.loc[cut, particle + '_eta'] = -inData.loc[cut, particle + '_eta'] 
+        inData.loc[cut, particle + '_eta'] = -inData.loc[cut, particle + '_eta']
 
 def xFlipEvent(inData):
     '''Flip event in x-axis such that (subleading) (leptoninc) tau is in positive x-direction'''
     cut = (inData.PRI_tau_phi < 0)
-    
+
     for particle in ['PRI_tau', 'PRI_jet_leading', 'PRI_jet_subleading', 'PRI_met']:
-        inData.loc[cut, particle + '_phi'] = -inData.loc[cut, particle + '_phi'] 
-    
+        inData.loc[cut, particle + '_phi'] = -inData.loc[cut, particle + '_phi']
+
 def convertData(inData, rotate=False, cartesian=True):
     '''Pass data through conversions and drop uneeded columns'''
     inData.replace([np.inf, -np.inf], np.nan, inplace=True)
     inData.fillna(-999.0, inplace=True)
     inData.replace(-999.0, 0.0, inplace=True)
-    
+
     if rotate:
         rotateEvent(inData)
         zFlipEvent(inData)
         xFlipEvent(inData)
-    
+
     if cartesian:
         moveToCartesian(inData, 'PRI_tau', drop=True)
         moveToCartesian(inData, 'PRI_lep', drop=True)
         moveToCartesian(inData, 'PRI_jet_leading', drop=True)
         moveToCartesian(inData, 'PRI_jet_subleading', drop=True)
         moveToCartesian(inData, 'PRI_met', z=False)
-        
+
         inData.drop(columns=["PRI_met_phi"], inplace=True)
-        
+
     if rotate and not cartesian:
         inData.drop(columns=["PRI_lep_phi"], inplace=True)
     elif rotate and cartesian:
@@ -104,11 +104,11 @@ def convertData(inData, rotate=False, cartesian=True):
 def saveBatch(inData, n, inputPipe, outFile, normWeights, mode, features):
     '''Save fold into hdf5 file'''
     grp = outFile.create_group('fold_' + str(n))
-    
+
     X = inputPipe.transform(inData[features].values.astype('float32'))
     inputs = grp.create_dataset("inputs", shape=X.shape, dtype='float32')
     inputs[...] = X
-    
+
     if mode != 'testing':
         if normWeights:
             inData.loc[inData.gen_target == 0, 'gen_weight'] = inData.loc[inData.gen_target == 0, 'gen_weight']/np.sum(inData.loc[inData.gen_target == 0, 'gen_weight'])
@@ -125,7 +125,7 @@ def saveBatch(inData, n, inputPipe, outFile, normWeights, mode, features):
         X_orig_weights = inData['gen_weight_original'].values.astype('float32')
         orig_weights = grp.create_dataset("orig_weights", shape=X_weights.shape, dtype='float32')
         orig_weights[...] = X_orig_weights
-    
+
     else:
         X_EventId = inData['EventId'].values.astype('int')
         EventId = grp.create_dataset("EventId", shape=X_EventId.shape, dtype='int')
@@ -187,7 +187,7 @@ if __name__ == '__main__':
     parser.add_option("-m", "--mode", dest = "mode", action = "store", default = "OpenData", help = "Using open data or Kaggle data")
     parser.add_option("-v", "--valSize", dest = "valSize", action = "store", default = 0.2, help = "Fraction of data to use for validation")
     parser.add_option("-s", "--seed", dest = "seed", action = "store", default = 1337, help = "Seed for train/val split")
-    parser.add_option("-n", "--nFolds", dest = "nFolds", action = "store", default = 10, help = "Nmber of folds to split data")
+    parser.add_option("-n", "--nFolds", dest = "nFolds", action = "store", default = 10, type = int, help = "Nmber of folds to split data")
     opts, args = parser.parse_args()
 
     runDataImport(opts.dirLoc, opts.rotate, opts.cartesian, opts.mode, opts.valSize, opts.seed, opts.nFolds)

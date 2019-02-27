@@ -8,7 +8,7 @@ import types
 from six.moves import cPickle as pickle
 import glob
 
-from keras.models import Sequential,model_from_json, load_model
+from keras.models import Model, model_from_json, load_model
 
 #from rep.estimators import XGBoostClassifier
 
@@ -24,7 +24,7 @@ def ensemblePredict(inData, ensemble, weights, outputPipe=None, nOut=1, n=-1): #
     weights = weights[0:n]
     weights = weights/weights.sum() #Renormalise weights
     for i, model in enumerate(ensemble):
-        if isinstance(model, Sequential):
+        if isinstance(model, Model):
             tempPred =  model.predict(inData, verbose=0)
         elif isinstance(model, XGBoostClassifier):
             tempPred = model.predict_proba(inData)[:,1][:, np.newaxis] #Works for one output, might need to be fixed for multiclass
@@ -86,7 +86,7 @@ def saveEnsemble(name, ensemble, weights, compileArgs=None, overwrite=False, inp
         os.system("rm " + name + "*.pkl")
         saveCompileArgs = False
         for i, model in enumerate(ensemble):
-            if isinstance(model, Sequential):
+            if isinstance(model, Model):
                 saveCompileArgs = True
                 if saveMode == 'weights':
                     json_string = model.to_json()

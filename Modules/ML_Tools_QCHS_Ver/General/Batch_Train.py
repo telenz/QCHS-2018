@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, print_function
 
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import roc_auc_score, roc_curve
@@ -55,10 +55,10 @@ def getFolds(n, nSplits):
 def batchLRFind(batchYielder,
                 modelGen, modelGenParams,
                 trainParams, trainOnWeights=True,
-                lrBounds=[1e-5, 10], verbose=False, allFolds=True):
+                lrBounds=[1e-5, 10], verbose=False, allFolds=True,
+                binary=None):
 
     start = timeit.default_timer()
-    binary = None
 
     if not isinstance(batchYielder, BatchYielder):
         print ("HDF5 as input is depreciated, converting to BatchYielder")
@@ -76,6 +76,7 @@ def batchLRFind(batchYielder,
         model.reset_states #Just checking
 
         trainbatch = batchYielder.getBatch(np.random.choice(range(batchYielder.nFolds))) #Load fold
+
         nSteps = math.ceil(len(trainbatch['targets'])/trainParams['batch_size'])
         if verbose: print ("Using {} steps".format(nSteps))
 
@@ -106,7 +107,7 @@ def batchLRFind(batchYielder,
     print("Training finished")
     print("Cross-validation took {:.3f}s ".format(timeit.default_timer() - start))
     if allFolds:
-        getLRFinderMeanPlot(lrFinders, loss='loss', cut=-10)
+        getLRFinderMeanPlot(lrFinders, loss='loss', cut=100)
     else:
         lrFinders[0].plot_lr()
         lrFinders[0].plot(n_skip=10)
@@ -316,7 +317,8 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                          swaStart=-1, swaRenewal=-1, sgdReplacement=False,
                          trainOnWeights=True,
                          saveLoc='train_weights/', patience=10, maxEpochs=10000,
-                         verbose=False, logoutput=False, amsSize=0, plot=True):
+                         verbose=False, logoutput=False, amsSize=0, plot=True, binary=None,
+                         stopIfStallingTest=-1):
 
     os.system("mkdir " + saveLoc)
     os.system("rm " + saveLoc + "*.h5")
@@ -333,7 +335,6 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
     start = timeit.default_timer()
     results = []
     histories = []
-    binary = None
 
     if not isinstance(batchYielder, BatchYielder):
         print ("HDF5 as input is depreciated, converting to BatchYielder")
@@ -353,12 +354,21 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
         epochCounter = 0
         subEpoch = 0
         stop = False
-        lossHistory = {'val_loss':[], 'swa_val_loss':[]}
+        lossHistory = {
+            'val_loss':[],
+            'swa_val_loss':[],
+            'val_train_loss':[],
+            'AUC':[],
+            'wAUC':[],
+            'ACC':[],
+            'wACC':[],
+        }
         trainID, testID = getFolds(fold, nSplits) #Get fold indeces for training and testing for current fold
 
+        K.clear_session()
         model = None
         model = modelGen(**modelGenParams)
-        model.reset_states #Just checking
+        model.reset_states
 
         testbatch = batchYielder.getBatch(testID) #Load testing fold
 
@@ -387,6 +397,8 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
             for n in trainID: #Loop through training folds
                 trainbatch = batchYielder.getBatch(n) #Load fold data
                 subEpoch += 1
+                if verbose:
+                    print('.', sep='', end='')
 
                 if binary == None: #First run, check classification mode
                     binary = True
@@ -399,8 +411,13 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                         print (nClasses, "classes found, running in binary mode\n")
 
                 if trainOnWeights:
-                    model.fit(trainbatch['inputs'], trainbatch['targets'], sample_weight=trainbatch['weights'],
-                              callbacks = callbacks, **trainParams) #Train for one epoch
+                    train_history = model.fit(
+                        trainbatch['inputs'],
+                        trainbatch['targets'],
+                        sample_weight=trainbatch['weights'],
+                        callbacks = callbacks,
+                        **trainParams
+                    ) #Train for one epoch
 
                     if swaStart >= 0 and swa.active:
                         losses = swa.get_losses()
@@ -416,9 +433,13 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                         loss = model.evaluate(testbatch['inputs'], testbatch['targets'], sample_weight=testbatch['weights'], verbose=0)
 
                 else:
-                    model.fit(trainbatch['inputs'], trainbatch['targets'],
-                              class_weight = 'auto',
-                              callbacks = callbacks, **trainParams) #Train for one epoch
+                    train_history = model.fit(
+                        trainbatch['inputs'],
+                        trainbatch['targets'],
+                        class_weight = 'auto',
+                        callbacks = callbacks,
+                        **trainParams
+                    ) #Train for one epoch
 
                     if swaStart >= 0 and swa.active:
                         losses = swa.get_losses()
@@ -444,12 +465,32 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                         lossHistory['val_loss'].append(loss)
                 else:
                     lossHistory['val_loss'].append(loss)
-                    _lh = lossHistory['val_loss']
-                    if (len(_lh) > 20
-                    and (_lh[-19] - _lh[-1])/_lh[-1] < 1e-7
-                    ):
-                        print('Learning process stalled at %s. Stopping...'%_lh[-1])
-                        stop = True
+
+                lossHistory['val_train_loss'].append(train_history.history['loss'])
+
+                if binary:
+                    testbatch = batchYielder.getBatch(testID) #Load testing fold
+                    prediction = model.predict(testbatch['inputs'], verbose=0)
+                    prediction4acc = (prediction>0.5)*1
+                    targets = testbatch.get('orig_targets', testbatch['targets'])
+
+                    if not isinstance(testbatch['weights'], type(None)):
+                        lossHistory['wAUC'] = 1-roc_auc_score(targets,
+                                                              prediction,
+                                                              sample_weight=testbatch['weights'])
+                        lossHistory['wACC'] = accuracy_score(targets,
+                                                             prediction4acc,
+                                                             sample_weight=testbatch['weights'])
+                    lossHistory['AUC'] = 1-roc_auc_score(targets, prediction)
+                    lossHistory['ACC'] = accuracy_score(targets, prediction4acc)
+
+                _lh = lossHistory['val_loss']
+                if (stopIfStallingTest > 0
+                and len(_lh) > stopIfStallingTest+1
+                and (_lh[-stopIfStallingTest] - _lh[-1])/_lh[-1] < 1e-7
+                ):
+                    print('Learning process stalled at %s. Stopping...'%_lh[-1])
+                    stop = True
 
 
                 if loss < best or best < 0: #Save best
@@ -478,7 +519,7 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                     if reduxDecayActive:
                         cosAnneal.lrs.append(float(K.get_value(model.optimizer.lr)))
                     if verbose:
-                        print ('{} New best found: {}'.format(subEpoch, best))
+                        print ('\n{} New best found: {}'.format(subEpoch, best))
                 elif cosAnnealMult and not reduxDecayActive:
                     if cosAnneal.cycle_end:
                         epochCounter += 1
@@ -510,21 +551,22 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
 
         model.load_weights(saveLoc +  "best.h5")
 
-        histories.append({})
-        histories[-1]['val_loss'] = lossHistory['val_loss']
-        if swaStart >= 0:
-            histories[-1]['swa_val_loss'] = lossHistory['swa_val_loss']
+        histories.append(lossHistory.copy())
+        #histories[-1]['val_loss'] = lossHistory['val_loss']
+        #if swaStart >= 0:
+        #    histories[-1]['swa_val_loss'] = lossHistory['swa_val_loss']
 
         results.append({})
         results[-1]['loss'] = best
         if binary:
             testbatch = batchYielder.getBatch(testID) #Load testing fold
             prediction = model.predict(testbatch['inputs'], verbose=0)
+            targets = testbatch.get('orig_targets', testbatch['targets'])
             if not isinstance(testbatch['weights'], type(None)):
-                results[-1]['wAUC'] = 1-roc_auc_score(testbatch['targets'],
+                results[-1]['wAUC'] = 1-roc_auc_score(targets,
                                                       prediction,
                                                       sample_weight=testbatch['weights'])
-            results[-1]['AUC'] = 1-roc_auc_score(testbatch['targets'], prediction)
+            results[-1]['AUC'] = 1-roc_auc_score(targets, prediction)
 
             if amsSize:
                  results[-1]['AMS'], results[-1]['cut'] = amsScanQuick(batchYielder.getBatchDF(testID, preds=prediction, weightName='orig_weights'),
@@ -532,8 +574,10 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
         print ("Score is:", results[-1])
 
         if plotLR: cosAnneal.plot_lr()
-        if plotMomentum: cosAnnealMomentum.plot_momentum()
-        if plotOneCycle: oneCycle.plot()
+        #if plotMomentum: cosAnnealMomentum.plot_momentum()
+        #if plotOneCycle: oneCycle.plot()
+        if callable(plot):
+            plot(lossHistory)
 
         print("Fold took {:.3f}s\n".format(timeit.default_timer() - foldStart))
 
@@ -544,7 +588,7 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
     print("\n______________________________________")
     print("Training finished")
     print("Cross-validation took {:.3f}s ".format(timeit.default_timer() - start))
-    if plot: plotTrainingHistory(histories, save=saveLoc + 'loss_history.png')
+    #if plot: plotTrainingHistory(histories, save=saveLoc + 'loss_history.png')
     for score in results[0]:
         mean = uncertRound(np.mean([x[score] for x in results]), np.std([x[score] for x in results])/np.sqrt(len(results)))
         print ("Mean", score, "= {} +- {}".format(mean[0], mean[1]))

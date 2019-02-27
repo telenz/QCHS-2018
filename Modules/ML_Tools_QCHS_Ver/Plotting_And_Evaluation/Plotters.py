@@ -1,6 +1,6 @@
 from __future__ import division
 
-from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.metrics import roc_auc_score, roc_curve, accuracy_score
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -145,11 +145,15 @@ def rocPlot(inData=None, curves=None, predName='pred_class', targetName='gen_tar
 def getClassPredPlot(inData, labels=['Background', 'Signal'], predName='pred_class', weightName=None,
                      lim=(0,1), logy=True, params={'hist' : True, 'kde' : False, 'norm_hist' : True}):
     plt.figure(figsize=(16, 8))
+    p, bins = None, None
     for i in range(len(inData)):
         hist_kws = {}
         if not isinstance(weightName, type(None)):
             hist_kws['weights'] = inData[i][weightName]
-        sns.distplot(inData[i][predName], label=labels[i], hist_kws=hist_kws, **params)
+        if p:
+            n_bins = len(p.patches)
+            bins = list(v/float(n_bins) for v in range(n_bins+1))
+        p = sns.distplot(inData[i][predName], label=labels[i], bins=bins, hist_kws=hist_kws, **params)
     plt.legend(loc='best', fontsize=16)
     plt.xlabel("Class prediction", fontsize=24, color='black')
     plt.xlim(lim)
@@ -387,9 +391,9 @@ def plotSignificanceEstimate(
     n_bins_filled = min(sum(s>0), sum(b>0))
     s = s[:n_bins_filled]
     b = b[:n_bins_filled]
-    bin_centers = bin_centers[:n_bins_filled] 
+    bin_centers = bin_centers[:n_bins_filled]
 
-    for name, fnc in sigEstFuncs.iteritems():
+    for name, fnc in sorted(sigEstFuncs.iteritems()):
         est = fnc(s, b)
         est, err = est if len(est) == 2 else (est, None)
         p = plt.plot(bin_centers, est, label=name)
