@@ -55,17 +55,23 @@ class BatchYielder(object):
         return data
 
 
-class BatchYielderTargetMod(BatchYielder):
-    def getBatch(self, index, datafile=None):
-        d = super(BatchYielderTargetMod, self).getBatch(index, datafile)
+def get_BatchYielderTargetMod(superclass):
+    """Patch batch yielder class to do weight encoding."""
+    class BatchYielderTargetMod(superclass):
+        def getBatch(self, index, datafile=None):
+            d = super(BatchYielderTargetMod, self).getBatch(index, datafile)
+    
+            # encode weights and targets into one array (negative numbers are background)
+            if not d.get('orig_targets', None):
+                t, w = d['targets'], d['weights']
+                d['orig_targets'] = t
+                d['targets'] = (t*2-1)*w
+            return d
+    return BatchYielderTargetMod
 
-        # encode weights and targets into one array (negative numbers are background)
-        if not d.get('orig_targets', None):
-            t, w = d['targets'], d['weights']
-            d['orig_targets'] = t
-            d['targets'] = (t*2-1)*w
-        return d
 
+BatchYielderTargetMod = get_BatchYielderTargetMod(BatchYielder)
+        
 
 class HEPAugBatch(BatchYielder):
     def __init__(self, header, datafile=None, inputPipe=None,

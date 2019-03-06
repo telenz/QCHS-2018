@@ -313,7 +313,8 @@ def getFeature(feature, datafile, nFolds=-1, ravel=True, setFold=-1):
 def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainParams,
                          cosAnnealMult=0, reverseAnneal=False, plotLR=False, reduxDecay=False,
                          annealMomentum=False, reverseAnnealMomentum=False, plotMomentum=False,
-                         oneCycle=False, ratio=0.25, reverse=False, lrScale=10, momScale=0.1, plotOneCycle=False, scale=30, mode='sgd',
+                         oneCycle=False, ratio=0.25, reverse=False, lrScale=10, momScale=0.1, 
+                         plotOneCycle=False, scale=30, mode='sgd',
                          swaStart=-1, swaRenewal=-1, sgdReplacement=False,
                          trainOnWeights=True,
                          saveLoc='train_weights/', patience=10, maxEpochs=10000,
@@ -365,7 +366,6 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
         }
         trainID, testID = getFolds(fold, nSplits) #Get fold indeces for training and testing for current fold
 
-        K.clear_session()
         model = None
         model = modelGen(**modelGenParams)
         model.reset_states

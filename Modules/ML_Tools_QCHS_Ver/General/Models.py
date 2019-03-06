@@ -5,6 +5,7 @@ from keras.layers import Dense, Activation, AlphaDropout, Dropout, BatchNormaliz
 from keras.optimizers import *
 from keras.regularizers import *
 from keras.models import Sequential
+from keras import backend as K
 
 from Modules.ML_Tools_QCHS_Ver.General.Activations import *
 
@@ -25,6 +26,9 @@ def getOptimizer(compileArgs):
 
 
 def getModel(version, nIn, compileArgs, mode, nOut=1):
+    
+    K.clear_session()
+    
     #this is a hack postponing refactoring
     class MyMod(list):
         def add(self, obj):
