@@ -430,7 +430,7 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                             useSWA = False
 
                     else:
-                        loss = model.evaluate(testbatch['inputs'], testbatch['targets'], sample_weight=testbatch['weights'], verbose=0)
+                        loss = model.evaluate(testbatch['inputs'], testbatch['targets'], sample_weight=testbatch['weights'], verbose=0, batch_size=trainParams['batch_size'])
 
                 else:
                     train_history = model.fit(
@@ -451,7 +451,7 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                             loss = losses['base']
                             useSWA = False
                     else:
-                        loss = model.evaluate(testbatch['inputs'], testbatch['targets'], verbose=0)
+                        loss = model.evaluate(testbatch['inputs'], testbatch['targets'], verbose=0, batch_size=trainParams['batch_size'])
 
                 if swaStart >= 0 and swa.active and cosAnnealMult > 1:
                     print ("{} SWA loss:", subEpoch, loss)
