@@ -70,8 +70,9 @@ def asimovSignificanceLossInvert(syst_factr, s_exp=None, b_exp=None):
 
     #@_patch_with_weights
     def asimovSigLossInvert(y_true, y_pred):        
-        # The problem with inner_loss is that it's not monotonic. 
-        # For a given s, there's a b value at which the function is maximal,
+        # The problem with inner_loss is that it's not monotonic when using
+        # epsilons and numerically unstable otherwise.
+        # So for a given s, there's a b value at which the function is maximal,
         # after that value the function is falling and thus promoting more
         # background events to smaller loss values.
 
@@ -84,12 +85,11 @@ def asimovSignificanceLossInvert(syst_factr, s_exp=None, b_exp=None):
 
         # minimal background value for inner_loss to be on the safe side.
         def max_bkg(s):
-            return K.pow(s, .65)*1./K.pow(syst_factr, 0.65)
+            return K.pow(s, .65)*10./K.pow(syst_factr, 0.65)
         
         b_max = max_bkg(s)
         s_b_ok = K.greater(b_max, b)
         s_b_ok = K.print_tensor(s_b_ok, 's_b_ok=')
-        
         sb = K.stack([s,b])
         sb = K.print_tensor(sb, 'sb=')
 
@@ -103,25 +103,35 @@ def asimovSignificanceLossInvert(syst_factr, s_exp=None, b_exp=None):
             bpsyst2 = b+syst2            
             eps = K.epsilon()
             return 0.5/(
-                spb * K.log((spb*bpsyst2+eps)/(b2+spb*syst2+eps)+eps)
+                spb * K.log((spb*bpsyst2)/(b2+spb*syst2+eps)+eps)
                 -b2/(syst2+eps) * K.log(1+syst2*s/(b*bpsyst2+eps))
             )
-        
-        def sOverSqrtSpB(sb):
-            s, b = sb[0], sb[1]
-            return (s+b)/(s*s+K.epsilon())
 
-        # s/sqrt(s+b) is safe, as it is monotonic in s and b
-        def safe_inner_loss(sb):    
-            s_b_max = K.stack([s,b_max])
-            s_b_max0p95 = K.stack([s,b_max*0.95])
-            s_b_max1p05 = K.stack([s,b_max*1.05])
-            # the norm factor makes loss steady at the switching point 
-            norm = inner_loss(s_b_max) / sOverSqrtSpB(s_b_max)
-            return norm*sOverSqrtSpB(sb)
+        def safe_inner_loss(sb):
+            # linear function, continuing from b_max on
+            s, b = sb[0], sb[1]
+            b_max = max_bkg(s)
+            l_b_max     = inner_loss(K.stack([s,b_max     ]))
+            l_b_max0p95 = inner_loss(K.stack([s,b_max*0.95]))
+            l_b_max1p05 = inner_loss(K.stack([s,b_max*1.05]))
+
+            # vals = K.stack([l_b_max0p95,l_b_max,l_b_max1p05])
+            # vals = K.print_tensor(vals, 'l_b_max=')
+            # l_b_max0p95,l_b_max,l_b_max1p05 = vals[0],vals[1],vals[2]
+
+            slope = (l_b_max1p05-l_b_max0p95) / (b_max*0.1)
+            offset = l_b_max - slope*b_max
+
+            return (slope*b + offset)
+
+        loss = K.switch(s_b_ok, inner_loss(sb), safe_inner_loss(sb))
+
+        # numerical instabilities for s < 0.5 => b/s/s
+        s_at_low_bound = K.greater(0.5, s)
+        s_at_low_bound = K.print_tensor(s_at_low_bound, 's_at_low_bound=')
+        loss = K.switch(s_at_low_bound, b/s/s, loss)
         
-        #safe_sb = K.switch(s_b_ok, sb, K.ones(sb.shape))
-        return K.switch(s_b_ok, inner_loss(sb), safe_inner_loss(sb))
+        return loss
 
     return asimovSigLossInvert
 
