@@ -104,8 +104,11 @@ def saveEnsemble(name, ensemble, weights, compileArgs=None, overwrite=False, inp
                 print ("MVA not currently supported")
                 return None
         if saveCompileArgs:
-            with open(name + '_compile.json', 'w') as fout:
-                json.dump(compileArgs, fout)
+            try:
+                with open(name + '_compile.json', 'w') as fout:
+                    json.dump(compileArgs, fout)
+            except TypeError:
+                pass
         with open(name + '_weights.pkl', 'wb') as fout:
             pickle.dump(weights, fout)
         if inputPipe != None:
