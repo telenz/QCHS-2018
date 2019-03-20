@@ -126,11 +126,13 @@ def asimovSignificanceLossInvert(syst_factr, s_exp=None, b_exp=None):
 
         loss = K.switch(s_b_ok, inner_loss(sb), safe_inner_loss(sb))
 
-        # numerical instabilities for s < 0.5 => b/s/s
-        s_at_low_bound = K.greater(0.5, s)
+        # numerical instabilities for s < 0.2 => b/s/s
+        s_min = 0.2
+        s_at_low_bound = K.greater(s_min, s)
         s_at_low_bound = K.print_tensor(s_at_low_bound, 's_at_low_bound=')
-        loss = K.switch(s_at_low_bound, b/s/s, loss)
-        
+        norm = inner_loss(K.stack([s_min,b])) / (b/s_min/s_min)
+        loss = K.switch(s_at_low_bound, norm*b/s/s, loss)
+
         return loss
 
     return asimovSigLossInvert
