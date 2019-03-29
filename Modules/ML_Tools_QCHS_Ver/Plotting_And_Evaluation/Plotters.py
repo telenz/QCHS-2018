@@ -143,7 +143,7 @@ def rocPlot(inData=None, curves=None, predName='pred_class', targetName='gen_tar
     plt.show()
 
 def getClassPredPlot(inData, labels=['Background', 'Signal'], predName='pred_class', weightName=None,
-                     lim=(0,1), logy=True, params={'hist' : True, 'kde' : False, 'norm_hist' : True}):
+                     lim=(0,1), logy=True, n_bins=100, params={'hist' : True, 'kde' : False, 'norm_hist' : True}):
     plt.figure(figsize=(16, 8))
     p, bins = None, None
     for i in range(len(inData)):
@@ -151,9 +151,9 @@ def getClassPredPlot(inData, labels=['Background', 'Signal'], predName='pred_cla
         if not isinstance(weightName, type(None)):
             hist_kws['weights'] = inData[i][weightName]
         if p:
-            n_bins = len(p.patches)
+            #n_bins = len(p.patches)
             bins = list(v/float(n_bins) for v in range(n_bins+1))
-        p = sns.distplot(inData[i][predName], label=labels[i], bins=bins, hist_kws=hist_kws, **params)
+        p = sns.distplot(inData[i][predName], label=labels[i], bins=n_bins, hist_kws=hist_kws, **params)
     plt.legend(loc='best', fontsize=16)
     plt.xlabel("Class prediction", fontsize=24, color='black')
     plt.xlim(lim)
