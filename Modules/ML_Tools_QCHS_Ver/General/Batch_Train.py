@@ -348,8 +348,8 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
         foldStart = timeit.default_timer()
         print ("Running fold", fold+1, "/", nSplits)
         os.system("rm " + saveLoc + "best.h5")
-        best = -1
-        bestLR = -1
+        best = 1000000
+        bestLR = 1000000
         reduxDecayActive = False
         tmpPatience = patience
         epochCounter = 0
