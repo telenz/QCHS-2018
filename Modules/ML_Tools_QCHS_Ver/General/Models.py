@@ -43,13 +43,13 @@ def getModel(version, nIn, compileArgs, mode, nOut=1):
     reg = l2(compileArgs['l2']) if 'l2' in compileArgs else None
 
     if "modelRelu" in version:
-        model.add(Dense(width, input_dim=nIn, kernel_initializer='he_normal', kernel_regularizer=reg))
+        model.add(Dense(width, input_dim=nIn))
         if bn == 'pre': model.add(BatchNormalization())
         model.add(Activation('relu'))
         if bn == 'post': model.add(BatchNormalization())
         if do: model.add(Dropout(do))
         for i in range(depth):
-            model.add(Dense(width, kernel_initializer='he_normal', kernel_regularizer=reg))
+            model.add(Dense(width))
             if bn == 'pre': model.add(BatchNormalization())
             model.add(Activation('relu'))
             if bn == 'post': model.add(BatchNormalization())
