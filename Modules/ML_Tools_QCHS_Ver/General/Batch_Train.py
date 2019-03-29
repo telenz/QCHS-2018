@@ -194,7 +194,7 @@ def batchTrainRegressor(data, nSplits,
                     monLoss = model.evaluate(monitorInputs, monitorTargets, verbose=0)
                     monitorHistory.append(monLoss)
 
-                if monLoss < best or best < 0: #Save best
+                if monLoss < best: #Save best
                     best = monLoss
                     epochCounter = 0
                     model.save_weights(saveLoc + "best.h5")
@@ -392,7 +392,6 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                 swa = SWA(swaStart, testbatch, modelGen(**modelGenParams), verbose, swaRenewal, trainOnWeights=trainOnWeights, sgdReplacement=sgdReplacement)
             callbacks.append(swa)
         useSWA = False
-
         for epoch in range(maxEpochs):
             for n in trainID: #Loop through training folds
                 trainbatch = batchYielder.getBatch(n) #Load fold data
@@ -493,7 +492,7 @@ def batchTrainClassifier(batchYielder, nSplits, modelGen, modelGenParams, trainP
                     stop = True
 
 
-                if loss < best or best < 0: #Save best
+                if loss < best: #Save best
                     best = loss
                     if cosAnnealMult:
                         if cosAnneal.lrs[-1] > 0:
